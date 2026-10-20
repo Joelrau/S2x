@@ -699,6 +699,21 @@ namespace game
 		XAssetHeader header;
 	};
 
+	struct XAssetEntry
+	{
+		XAsset asset;
+		unsigned short zoneIndex;
+		volatile char inuseMask;
+		unsigned int nextHash;
+		unsigned int nextOverride;
+		unsigned int nextPoolEntry;
+	};
+	static_assert(offsetof(XAssetEntry, zoneIndex) == 0x10);
+	static_assert(offsetof(XAssetEntry, inuseMask) == 0x12);
+	static_assert(offsetof(XAssetEntry, nextHash) == 0x14);
+	static_assert(offsetof(XAssetEntry, nextOverride) == 0x18);
+	static_assert(sizeof(XAssetEntry) == 0x20);
+
 	enum scr_string_t
 	{
 		scr_string_t_dummy = 0x0,

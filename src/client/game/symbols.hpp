@@ -366,6 +366,18 @@ namespace game
 
 		WEAK symbol<mp::gentity_s*(const char* name, int customizationGroup)> SV_AddBot{ 0xF2650 };
 
+		WEAK symbol<HANDLE(int folder, const char* filename)> Sys_CreateFile{ 0x770450 };
+
+		WEAK symbol<unsigned int> db_hashTable{ 0x27D1110 };
+		WEAK symbol<XAssetEntry> g_assetEntryPool{ 0x50F60E0 };
+		WEAK symbol<int> g_poolSize{ 0xD90990 };
+		WEAK symbol<int> g_zoneCount{ 0x290B124 };
+		WEAK symbol<unsigned short> g_zoneHandles{ 0x59ADC90 };
+		WEAK symbol<volatile long> db_assetReadCount{ 0x1BA03C8 };
+		WEAK symbol<volatile long> db_assetWriteCount{ 0x1BA03CC };
+
+		WEAK symbol<int> ui_arenas_dirty{ 0xAB0F8AC };
+
 		WEAK symbol<int(mp::gentity_s* entity)> SV_SpawnTestClient{ 0xF6AA0 };
 		WEAK symbol<bool(char clientNum)> SV_HasAssignedTeam_Internal{ 0x6DF9D0 };
 		WEAK symbol<void(char clientNum, int team)> SV_SetAssignedTeam{ 0x6E1410 };
