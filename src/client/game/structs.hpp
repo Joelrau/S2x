@@ -656,6 +656,16 @@ namespace game
 		int len;
 		const char* buffer;
 	};
+	
+	struct MapEnts
+	{
+		const char* name;
+		char* entityString;
+		int numEntityChars;
+		// ...
+	};
+	static_assert(offsetof(MapEnts, entityString) == 0x8);
+	static_assert(offsetof(MapEnts, numEntityChars) == 0x10);
 
 	struct ScriptFile
 	{
