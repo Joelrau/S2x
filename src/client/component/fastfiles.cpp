@@ -29,6 +29,22 @@ namespace fastfiles
 		constexpr auto mod_zone_alloc_flags = 0x10000000;
 		constexpr auto mod_zone_name = "mod";
 
+		constexpr auto techset_size = 0x3A0u;
+
+		template <game::XAssetType Type, size_t ElementSize, size_t Size>
+		void reallocate_asset_pool()
+		{
+			alignas(16) static std::uint8_t pool[sizeof(void*) + ElementSize * Size]{};
+
+			utils::hook::set<void*>(&game::mp::g_assetPool[Type], pool);
+			game::mp::g_poolSize[Type] = static_cast<int>(Size);
+		}
+
+		void reallocate_asset_pools()
+		{
+			reallocate_asset_pool<game::ASSET_TYPE_TECHSET, techset_size, 3584 * 2>();
+		}
+
 		// makeshift database read (0xA0B00)
 		class db_read_lock
 		{
@@ -434,6 +450,8 @@ namespace fastfiles
 			{
 				return;
 			}
+
+			reallocate_asset_pools();
 
 			sys_create_file_hook.create(game::mp::Sys_CreateFile, sys_create_file_stub);
 

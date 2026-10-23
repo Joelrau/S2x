@@ -376,6 +376,7 @@ namespace game
 
 		WEAK symbol<unsigned int> db_hashTable{ 0x27D1110 };
 		WEAK symbol<XAssetEntry> g_assetEntryPool{ 0x50F60E0 };
+		WEAK symbol<void*> g_assetPool{ 0xB2F780 };
 		WEAK symbol<int> g_poolSize{ 0xD90990 };
 		WEAK symbol<int> g_zoneCount{ 0x290B124 };
 		WEAK symbol<unsigned short> g_zoneHandles{ 0x59ADC90 };
