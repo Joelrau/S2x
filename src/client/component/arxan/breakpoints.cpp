@@ -12,10 +12,18 @@ namespace arxan::breakpoints
 {
 	namespace
 	{
-		std::unordered_map<PVOID, void*> handle_handler;
+		std::mutex handler_mutex;
+		std::vector<std::pair<PVOID, void*>> handlers;
 
 		void fake_exception(void* address, _CONTEXT* fake_context, DWORD exception)
 		{
+			// Guards run on multiple threads while others register/remove handlers, so iterate a snapshot
+			std::vector<std::pair<PVOID, void*>> handlers_copy;
+			{
+				std::lock_guard _(handler_mutex);
+				handlers_copy = handlers;
+			}
+
 			_EXCEPTION_POINTERS fake_info{};
 			_EXCEPTION_RECORD fake_record{};
 			fake_info.ExceptionRecord = &fake_record;
@@ -24,16 +32,13 @@ namespace arxan::breakpoints
 			fake_record.ExceptionAddress = reinterpret_cast<void*>(reinterpret_cast<std::uint64_t>(address) + 3);
 			fake_record.ExceptionCode = exception;
 
-			for (auto& handler : handle_handler)
+			for (const auto& handler : handlers_copy)
 			{
-				if (handler.second)
+				auto result = utils::hook::invoke<LONG>(handler.second, &fake_info);
+				if (result)
 				{
-					auto result = utils::hook::invoke<LONG>(handler.second, &fake_info);
-					if (result)
-					{
-						memset(fake_context, 0, sizeof(_CONTEXT));
-						break;
-					}
+					memset(fake_context, 0, sizeof(_CONTEXT));
+					break;
 				}
 			}
 		}
@@ -61,7 +66,8 @@ namespace arxan::breakpoints
 				a.jmp(jump_target);
 			});
 
-			utils::hook::nop(game_address, 7);
+			// Single 5-byte write: nopping the trap first would let another thread run into the following bytes.
+			// The jmp's 2 leftover bytes are unreachable since the stub continues at jump_target.
 			utils::hook::jump(game_address, stub, false);
 		}
 
@@ -92,20 +98,18 @@ namespace arxan::breakpoints
 			}
 		}
 
+		std::once_flag patch_once;
+
 		void patch_breakpoints()
 		{
-			static bool once = false;
-			if (once)
+			std::call_once(patch_once, []
 			{
-				return;
-			}
-			once = true;
-
 #ifdef PRECOMPUTED
-			patch_breakpoints_precomputed();
+				patch_breakpoints_precomputed();
 #else
-			search_and_patch_breakpoints();
+				search_and_patch_breakpoints();
 #endif
+			});
 		}
 
 		PVOID WINAPI add_vectored_exception_handler_stub(ULONG first, PVECTORED_EXCEPTION_HANDLER handler)
@@ -113,14 +117,22 @@ namespace arxan::breakpoints
 			patch_breakpoints();
 
 			auto handle = AddVectoredExceptionHandler(first, handler);
-			handle_handler[handle] = handler;
+			if (handle)
+			{
+				std::lock_guard _(handler_mutex);
+				handlers.emplace_back(handle, handler);
+			}
 
 			return handle;
 		}
 
 		ULONG WINAPI remove_vectored_exception_handler_stub(PVOID handle)
 		{
-			handle_handler[handle] = nullptr;
+			{
+				std::lock_guard _(handler_mutex);
+				std::erase_if(handlers, [handle](const auto& entry) { return entry.first == handle; });
+			}
+
 			return RemoveVectoredExceptionHandler(handle);
 		}
 	}
