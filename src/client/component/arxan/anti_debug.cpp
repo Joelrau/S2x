@@ -605,7 +605,8 @@ namespace arxan::anti_debug
 		{
 			// When RenderDoc is injected, a game thread marks renderdoc.dll's code
 			// PAGE_READONLY, which crashes the process on its next call into RenderDoc.
-			const utils::nt::library renderdoc("renderdoc.dll");
+			// MinHook calls this while other threads are suspended, so it must not allocate.
+			const utils::nt::library renderdoc(GetModuleHandleA("renderdoc.dll"));
 			if (renderdoc && address)
 			{
 				const auto target = static_cast<std::uint8_t*>(address);
