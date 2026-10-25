@@ -91,13 +91,19 @@ namespace game
 	WEAK symbol<void(dvar_t* dvar, const char* value)> Dvar_SetString{ 0xB2E30 };
 
 	WEAK symbol<bool(int* min, int* max)> CG_GetFovRange{ 0x45830, 0x23F6B0 };
-	// MP only. Both getters decrypt their pointers and check their callers; use call_safe.
 	WEAK symbol<const std::byte*(int localClientNum)> CG_GetLocalClient{ 0x15330 };
 	WEAK symbol<const std::byte*(int localClientNum)> CG_GetLocalClientStatic{ 0x461E0 };
 	WEAK symbol<void(int localClientNum)> CG_ProcessSnapshots{ 0x43ADA0 };
 	WEAK symbol<const std::byte*(int localClientNum)> CG_ReadNextSnapshot{ 0x43B580 };
 
 	WEAK symbol<const ScreenPlacement*(const LocalClientNum_t localClientNum)> ScrPlace_GetViewPlacement{ 0x4A01B0, 0x272660 };
+
+	WEAK symbol<bool(int localClientNum, const ScreenPlacement* placement, const float* worldPos,
+		float* screenPos)> CG_WorldPosToScreenPosReal{ 0x3E6250 };
+
+	WEAK symbol<FxSystem*(int localClientNum)> FX_GetSystem{ 0x517710 };
+	WEAK symbol<void(FxSystemLock* lock)> FX_WaitEnterReadSystemLock{ 0x517F90 };
+	WEAK symbol<void(FxSystemLock* lock)> FX_ExitReadSystemLock{ 0x517EA0 };
 
 	WEAK symbol<const char*(int index)> Cmd_Argv{ 0x8D9F0 };
 	WEAK symbol<void(const char* text_in)> SV_Cmd_TokenizeString{ 0x64C070, 0x4665A0 };
@@ -399,6 +405,12 @@ namespace game
 		WEAK symbol<int> svs_time{ 0xC5FBA44 };
 		WEAK symbol<mp::client_t*> svs_clients{ 0xC5FBA58 };
 		WEAK symbol<mp::gentity_s> g_entities{ 0x9ED4430 };
+
+		WEAK symbol<clipMap_t> cm{ 0xAA73E80 };
+		WEAK symbol<GfxWorld*> gfx_world{ 0xFE1B8F0 };
+		WEAK symbol<ComWorld> com_world{ 0xAAA3760 };
+		WEAK symbol<int> scene_model_count{ 0x1484384 };
+		WEAK symbol<GfxSceneModel> scene_models{ 0x1484390 };
 	}
 
 	WEAK symbol<void(bool frontend, bool cg)> LUI_CoD_Init{ 0x318A00, 0x19CA30 };

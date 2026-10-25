@@ -704,6 +704,200 @@ namespace game
 		const char* name;
 	}; static_assert(offsetof(LocalizeEntry, name) == 0x8);
 
+	struct XModel
+	{
+		const char* name;
+		// ...
+	};
+
+	struct FxEffectDef
+	{
+		const char* name;
+		// ...
+	};
+
+	// MP 0x8874E0 indexes draw instances with << 7 and reads the model at +0x48.
+	struct GfxStaticModelDrawInst
+	{
+		vec3_t origin;
+		char __pad0[0x3C];
+		XModel* model;
+		char __pad1[0x30];
+	};
+	static_assert(sizeof(GfxStaticModelDrawInst) == 0x80);
+	static_assert(offsetof(GfxStaticModelDrawInst, model) == 0x48);
+
+	struct GfxLightRegionAxis
+	{
+		float dir[3];
+		float midPoint;
+		float halfSize;
+	};
+	static_assert(sizeof(GfxLightRegionAxis) == 0x14);
+
+	// MP 0x8B6090 tests the 9 k-dop slabs at +0x0/+0x24, then axisCount axes from +0x50.
+	struct GfxLightRegionHull
+	{
+		float kdopMidPoint[9];
+		float kdopHalfSize[9];
+		unsigned int axisCount;
+		GfxLightRegionAxis* axis;
+	};
+	static_assert(sizeof(GfxLightRegionHull) == 0x58);
+	static_assert(offsetof(GfxLightRegionHull, kdopHalfSize) == 0x24);
+	static_assert(offsetof(GfxLightRegionHull, axisCount) == 0x48);
+	static_assert(offsetof(GfxLightRegionHull, axis) == 0x50);
+
+	struct GfxLightRegion
+	{
+		unsigned int hullCount;
+		GfxLightRegionHull* hulls;
+	};
+	static_assert(sizeof(GfxLightRegion) == 0x10);
+
+	struct GfxWorld
+	{
+		const char* name;
+		char __pad0[0x2C];
+		// MP 0x8B5040 only tests light regions of primary lights past this index.
+		unsigned int lastSunPrimaryLightIndex;
+		// MP 0x259550 treats light indices below this as primary lights.
+		unsigned int primaryLightCount;
+		// MP 0x2590B0: the last primary lights of the list move with scriptables.
+		unsigned int movingScriptablePrimaryLightCount;
+		char __pad1[0xC60];
+		// MP 0x8B5040 indexes this by primary light (0x10 stride).
+		GfxLightRegion* lightRegion;
+		// MP 0x878400 sizes the per-view static model visibility bits from this count.
+		unsigned int smodelCount;
+		char __pad2[0x30C];
+		GfxStaticModelDrawInst* smodelDrawInsts;
+		// ...
+	};
+	static_assert(offsetof(GfxWorld, lastSunPrimaryLightIndex) == 0x34);
+	static_assert(offsetof(GfxWorld, primaryLightCount) == 0x38);
+	static_assert(offsetof(GfxWorld, movingScriptablePrimaryLightCount) == 0x3C);
+	static_assert(offsetof(GfxWorld, lightRegion) == 0xCA0);
+	static_assert(offsetof(GfxWorld, smodelCount) == 0xCA8);
+	static_assert(offsetof(GfxWorld, smodelDrawInsts) == 0xFB8);
+
+	// MP 0x8B5040 strides primary lights by 0xA8 and passes the origin at +0x34.
+	struct ComPrimaryLight
+	{
+		char __pad0[0xC];
+		// MP 0x16C3E5 copies this into the per-light shader color.
+		vec3_t color;
+		char __pad1[0x1C];
+		vec3_t origin;
+		char __pad2[0x68];
+	};
+	static_assert(sizeof(ComPrimaryLight) == 0xA8);
+	static_assert(offsetof(ComPrimaryLight, color) == 0xC);
+	static_assert(offsetof(ComPrimaryLight, origin) == 0x34);
+
+	struct ComWorld
+	{
+		const char* name;
+		char __pad0[0x8];
+		unsigned int primaryLightCount;
+		ComPrimaryLight* primaryLights;
+		char __pad1[0x10];
+	};
+	static_assert(sizeof(ComWorld) == 0x30);
+	static_assert(offsetof(ComWorld, primaryLightCount) == 0x10);
+	static_assert(offsetof(ComWorld, primaryLights) == 0x18);
+
+	// Filled by MP 0xE63A0 (model at +0x8, placement origin at +0x28).
+	struct GfxSceneModel
+	{
+		char __pad0[0x8];
+		XModel* model;
+		char __pad1[0x18];
+		vec3_t origin;
+		char __pad2[0x84];
+	};
+	static_assert(sizeof(GfxSceneModel) == 0xB8);
+	static_assert(offsetof(GfxSceneModel, model) == 0x8);
+	static_assert(offsetof(GfxSceneModel, origin) == 0x28);
+
+	// MP 0x4E0160 indexes poses by 0x3C and loads the origin from +0x10.
+	struct DynEntityPose
+	{
+		float quat[4];
+		vec3_t origin;
+		char __pad0[0x20];
+	};
+	static_assert(sizeof(DynEntityPose) == 0x3C);
+	static_assert(offsetof(DynEntityPose, origin) == 0x10);
+
+	// MP 0x4DDC10 indexes clients by 0x30 and stores the active model at +0x18.
+	struct DynEntityClient
+	{
+		char __pad0[0x18];
+		XModel* activeModel;
+		char __pad1[0x10];
+	};
+	static_assert(sizeof(DynEntityClient) == 0x30);
+	static_assert(offsetof(DynEntityClient, activeModel) == 0x18);
+
+	struct clipMap_t
+	{
+		const char* name;
+		char __pad0[0x330];
+		unsigned short dynEntCount[2];
+		char __pad1[0x4];
+		char __pad2[0x10]; // dynEntDefList[2], 0x78 bytes per def
+		DynEntityPose* dynEntPoseList[2];
+		DynEntityClient* dynEntClientList[2];
+		// ...
+	};
+	static_assert(offsetof(clipMap_t, dynEntCount) == 0x338);
+	static_assert(offsetof(clipMap_t, dynEntPoseList) == 0x350);
+	static_assert(offsetof(clipMap_t, dynEntClientList) == 0x360);
+
+	struct FxSpatialFrame
+	{
+		float quat[4];
+		vec3_t origin;
+	};
+	static_assert(sizeof(FxSpatialFrame) == 0x1C);
+
+	// FX effect updates copy frameNow (+0x94) to framePrev (+0xB0), e.g. MP 0x51B8A2.
+	struct FxEffect
+	{
+		const FxEffectDef* def;
+		char __pad0[0x8C];
+		FxSpatialFrame frameNow;
+		FxSpatialFrame framePrev;
+		char __pad1[0x74];
+	};
+	static_assert(sizeof(FxEffect) == 0x140);
+	static_assert(offsetof(FxEffect, frameNow) == 0x94);
+	static_assert(offsetof(FxEffect, framePrev) == 0xB0);
+
+	struct FxSystemLock;
+
+	// MP FX_GetSystem (0x517710) strides by 0x900. MP 0x516970 walks
+	// allEffectHandles from +0xA0 to +0xA8 under the lock at +0x100.
+	struct FxSystem
+	{
+		FxEffect* effects;
+		char __pad0[0x98];
+		int firstActiveEffect;
+		char __pad1[0x4];
+		int firstFreeEffect;
+		char __pad2[0x4];
+		unsigned int* allEffectHandles;
+		char __pad3[0x48];
+		FxSystemLock* lock;
+		char __pad4[0x7F8];
+	};
+	static_assert(sizeof(FxSystem) == 0x900);
+	static_assert(offsetof(FxSystem, firstActiveEffect) == 0xA0);
+	static_assert(offsetof(FxSystem, firstFreeEffect) == 0xA8);
+	static_assert(offsetof(FxSystem, allEffectHandles) == 0xB0);
+	static_assert(offsetof(FxSystem, lock) == 0x100);
+
 	union XAssetHeader
 	{
 		void* data;
