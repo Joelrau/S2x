@@ -379,6 +379,9 @@ namespace game
 		WEAK symbol<mp::playerState_s*(int clientNum)> SV_GetPlayerstateForClientNum{ 0x6D9AF0 };
 
 		WEAK symbol<Weapon(const char* name)> G_GetWeaponForName{ 0x5C4C00 };
+		WEAK symbol<void()> G_SetWeaponConfigstrings{ 0x55C7B0 };
+		WEAK symbol<void(unsigned int weaponIndex)> G_RegisterWeapon{ 0x55B380 };
+		WEAK symbol<Weapon(const char* name, void(*register_callback)(unsigned int weaponIndex))> BG_GetWeaponIndexForName{ 0x3B6EF0 };
 		WEAK symbol<int(mp::playerState_s* ps, const Weapon* weapon, int dualWield, int startAlt,
 			int a5, unsigned char sourceClientNum, unsigned short a7, unsigned short a8)> G_GivePlayerWeapon{ 0x5C5290 };
 		WEAK symbol<void(mp::playerState_s* ps, const Weapon* weapon, int hadWeapon)> G_InitializeAmmo{ 0x55AD90 };
@@ -398,6 +401,8 @@ namespace game
 		WEAK symbol<unsigned short> g_zoneHandles{ 0x59ADC90 };
 		WEAK symbol<volatile long> db_assetReadCount{ 0x1BA03C8 };
 		WEAK symbol<volatile long> db_assetWriteCount{ 0x1BA03CC };
+
+		WEAK symbol<unsigned int> bg_lastParsedWeaponIndex{ 0x8A9C640 };
 
 		WEAK symbol<int> ui_arenas_dirty{ 0xAB0F8AC };
 

@@ -18,11 +18,8 @@ namespace fastfiles
 {
 	namespace
 	{
-		// DB_FindXAssetEntry (0xA0FC0) reduces the name hash modulo this
-		constexpr auto db_hash_table_size = 0x48800u;
-
-		// Zone slots in g_zones (0x58360E0, stride 0x5B0)
-		constexpr auto max_zone_slots = 0x421u;
+		constexpr auto db_hash_table_size = 0x48800u; // DB_FindXAssetEntry (0xA0FC0)
+		constexpr auto max_zone_slots = 0x421u; // 0x58360E0, stride 0x5B0
 
 		constexpr auto ui_zone_alloc_flags = 4;
 
@@ -30,6 +27,8 @@ namespace fastfiles
 		constexpr auto mod_zone_name = "mod";
 
 		constexpr auto techset_size = 0x3A0u;
+
+		std::vector<std::string> user_zones;
 
 		template <game::XAssetType Type, size_t ElementSize, size_t Size>
 		void reallocate_asset_pool()
@@ -144,7 +143,6 @@ namespace fastfiles
 
 			std::filesystem::path zone_directory = "zone";
 
-			// Localized usermap zones are named "<language>_<map>" and live next to the map's own zone
 			auto usermap = get_usermap_name(filename);
 			if (folder == localized_zone_folder)
 			{
@@ -221,10 +219,7 @@ namespace fastfiles
 
 		bool is_mod_zone_loaded()
 		{
-			return std::ranges::any_of(get_loaded_zones(), [](const zone_info& info)
-			{
-				return (info.flags & mod_zone_alloc_flags) != 0;
-			});
+			return std::ranges::any_of(get_loaded_zones(), is_mod_zone);
 		}
 
 		// DB_LoadXAssets (0xA4F60) unloads the assets of every zone matching the free flags, but only
@@ -244,24 +239,50 @@ namespace fastfiles
 			utils::hook::invoke<void>(0xADCE0_g, mod_zone_alloc_flags, mod_zone_alloc_flags);
 		}
 
-		bool should_add_mod_zone(const std::vector<game::XZoneInfo>& zones)
+		std::vector<const char*> get_mod_zone_names()
 		{
-			if (mods::get_loaded_mod().empty())
+			std::vector<const char*> names;
+			if (!mods::get_loaded_mod().empty() && exists(mod_zone_name))
 			{
-				return false;
+				names.emplace_back(mod_zone_name);
 			}
 
+			for (const auto& zone : user_zones)
+			{
+				if (exists(zone))
+				{
+					names.emplace_back(zone.data());
+				}
+			}
+
+			return names;
+		}
+
+		std::vector<game::XZoneInfo> get_mod_zones()
+		{
+			std::vector<game::XZoneInfo> zones;
+			for (const auto* name : get_mod_zone_names())
+			{
+				console::info("[Fastfiles] Loading zone '%s'\n", name);
+
+				game::XZoneInfo info{};
+				info.name = name;
+				info.allocFlags = mod_zone_alloc_flags;
+				info.freeFlags = 0;
+				zones.emplace_back(info);
+			}
+
+			return zones;
+		}
+
+		bool should_add_mod_zones(const std::vector<game::XZoneInfo>& zones)
+		{
 			const auto has_ui_zone = std::ranges::any_of(zones, [](const game::XZoneInfo& zone)
 			{
 				return is_ui_zone(zone.name);
 			});
 
-			if (!has_ui_zone || is_mod_zone_loaded())
-			{
-				return false;
-			}
-
-			return exists(mod_zone_name);
+			return has_ui_zone && !is_mod_zone_loaded();
 		}
 
 		bool skip_localized_zone = false;
@@ -290,7 +311,6 @@ namespace fastfiles
 		{
 			std::vector<game::XZoneInfo> data(zones, zones + count);
 
-			// The mod zone shares the lifetime of the ui zones
 			const auto frees_ui_zones = std::ranges::any_of(data, [](const game::XZoneInfo& zone)
 			{
 				return (zone.freeFlags & ui_zone_alloc_flags) != 0;
@@ -301,15 +321,9 @@ namespace fastfiles
 				free_mod_zone();
 			}
 
-			if (should_add_mod_zone(data))
+			if (should_add_mod_zones(data))
 			{
-				console::info("[Fastfiles] Loading zone '%s' for mod '%s'\n", mod_zone_name, mods::get_loaded_mod().data());
-
-				game::XZoneInfo info{};
-				info.name = mod_zone_name;
-				info.allocFlags = mod_zone_alloc_flags;
-				info.freeFlags = 0;
-				data.emplace_back(info);
+				std::ranges::copy(get_mod_zones(), std::back_inserter(data));
 			}
 
 			game::DB_LoadXAssets(data.data(), static_cast<unsigned int>(data.size()), sync_mode);
@@ -393,6 +407,11 @@ namespace fastfiles
 		info.freeFlags = 0;
 		game::DB_LoadXAssets(&info, 1, game::DB_LOAD_ASYNC);
 		return true;
+	}
+
+	bool is_mod_zone(const zone_info& info)
+	{
+		return (info.flags & mod_zone_alloc_flags) != 0;
 	}
 
 	std::string get_zone_name(const unsigned int index)
@@ -509,18 +528,11 @@ namespace fastfiles
 		{
 			free_mod_zone();
 
-			if (!mods::get_loaded_mod().empty() && exists(mod_zone_name))
+			if (auto zones = get_mod_zones(); !zones.empty())
 			{
-				console::info("[Fastfiles] Loading zone '%s' for mod '%s'\n", mod_zone_name, mods::get_loaded_mod().data());
-
-				game::XZoneInfo info{};
-				info.name = mod_zone_name;
-				info.allocFlags = mod_zone_alloc_flags;
-				info.freeFlags = 0;
-
 				// DB_LOAD_SYNC waits in DB_LoadXAssets until the zone is loaded, so the mod's assets
 				// are available before the caller continues (e.g. restarting LUI)
-				game::DB_LoadXAssets(&info, 1, game::DB_LOAD_SYNC);
+				game::DB_LoadXAssets(zones.data(), static_cast<unsigned int>(zones.size()), game::DB_LOAD_SYNC);
 			}
 
 			on_loaded();
@@ -586,14 +598,26 @@ namespace fastfiles
 				}
 
 				const std::string name = params.get(1);
-				const auto alloc_flags = params.size() > 2
-					? static_cast<int>(std::strtol(params.get(2), nullptr, 0))
-					: ui_zone_alloc_flags;
+				const auto keeps_zone = params.size() < 3;
+				const auto alloc_flags = keeps_zone
+					? mod_zone_alloc_flags
+					: static_cast<int>(std::strtol(params.get(2), nullptr, 0));
+
+				if (keeps_zone && std::ranges::find(user_zones, name) != user_zones.end() && is_zone_loaded(name))
+				{
+					console::info("loadzone: zone '%s' is already loaded\n", name.data());
+					return;
+				}
 
 				if (!try_load_zone(name, alloc_flags))
 				{
 					console::warn("loadzone: zone '%s' could not be found\n", name.data());
 					return;
+				}
+
+				if (keeps_zone && std::ranges::find(user_zones, name) == user_zones.end())
+				{
+					user_zones.emplace_back(name);
 				}
 
 				console::info("Loading zone '%s' (flags 0x%X)\n", name.data(), alloc_flags);
