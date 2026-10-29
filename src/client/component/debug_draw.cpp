@@ -98,14 +98,14 @@ namespace debug_draw
 		void draw_static_models(const draw_context& context)
 		{
 			const auto* world = *game::mp::gfx_world;
-			if (!world || !world->smodelDrawInsts)
+			if (!world || !world->models)
 			{
 				return;
 			}
 
-			for (unsigned int i = 0; i < world->smodelCount; ++i)
+			for (unsigned int i = 0; i < world->model_count; ++i)
 			{
-				const auto& inst = world->smodelDrawInsts[i];
+				const auto& inst = world->models[i];
 				if (inst.model)
 				{
 					draw_label(context, inst.model->name, inst.origin, static_model_color);

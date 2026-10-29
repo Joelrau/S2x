@@ -66,8 +66,8 @@ namespace arxan::breakpoints
 				a.jmp(jump_target);
 			});
 
-			// Single 5-byte write: nopping the trap first would let another thread run into the following bytes.
-			// The jmp's 2 leftover bytes are unreachable since the stub continues at jump_target.
+			// The stub jumps to the original target, so the trailing two bytes are never executed.
+			// Avoid leaving a NOP-only window before installing the jump.
 			utils::hook::jump(game_address, stub, false);
 		}
 

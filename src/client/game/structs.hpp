@@ -3,6 +3,10 @@
 #define PROTOCOL 1
 
 #ifdef __cplusplus
+#include "types/collision.hpp"
+#include "types/materials.hpp"
+#include "types/rendering.hpp"
+
 namespace game
 {
 #endif
@@ -10,11 +14,6 @@ namespace game
 	typedef vec_t vec2_t[2];
 	typedef vec_t vec3_t[3];
 	typedef vec_t vec4_t[4];
-
-	struct Material
-	{
-		const char* name;
-	};
 
 	struct Glyph
 	{
@@ -704,82 +703,11 @@ namespace game
 		const char* name;
 	}; static_assert(offsetof(LocalizeEntry, name) == 0x8);
 
-	struct XModel
-	{
-		const char* name;
-		// ...
-	};
-
 	struct FxEffectDef
 	{
 		const char* name;
 		// ...
 	};
-
-	// MP 0x8874E0 indexes draw instances with << 7 and reads the model at +0x48.
-	struct GfxStaticModelDrawInst
-	{
-		vec3_t origin;
-		char __pad0[0x3C];
-		XModel* model;
-		char __pad1[0x30];
-	};
-	static_assert(sizeof(GfxStaticModelDrawInst) == 0x80);
-	static_assert(offsetof(GfxStaticModelDrawInst, model) == 0x48);
-
-	struct GfxLightRegionAxis
-	{
-		float dir[3];
-		float midPoint;
-		float halfSize;
-	};
-	static_assert(sizeof(GfxLightRegionAxis) == 0x14);
-
-	// MP 0x8B6090 tests the 9 k-dop slabs at +0x0/+0x24, then axisCount axes from +0x50.
-	struct GfxLightRegionHull
-	{
-		float kdopMidPoint[9];
-		float kdopHalfSize[9];
-		unsigned int axisCount;
-		GfxLightRegionAxis* axis;
-	};
-	static_assert(sizeof(GfxLightRegionHull) == 0x58);
-	static_assert(offsetof(GfxLightRegionHull, kdopHalfSize) == 0x24);
-	static_assert(offsetof(GfxLightRegionHull, axisCount) == 0x48);
-	static_assert(offsetof(GfxLightRegionHull, axis) == 0x50);
-
-	struct GfxLightRegion
-	{
-		unsigned int hullCount;
-		GfxLightRegionHull* hulls;
-	};
-	static_assert(sizeof(GfxLightRegion) == 0x10);
-
-	struct GfxWorld
-	{
-		const char* name;
-		char __pad0[0x2C];
-		// MP 0x8B5040 only tests light regions of primary lights past this index.
-		unsigned int lastSunPrimaryLightIndex;
-		// MP 0x259550 treats light indices below this as primary lights.
-		unsigned int primaryLightCount;
-		// MP 0x2590B0: the last primary lights of the list move with scriptables.
-		unsigned int movingScriptablePrimaryLightCount;
-		char __pad1[0xC60];
-		// MP 0x8B5040 indexes this by primary light (0x10 stride).
-		GfxLightRegion* lightRegion;
-		// MP 0x878400 sizes the per-view static model visibility bits from this count.
-		unsigned int smodelCount;
-		char __pad2[0x30C];
-		GfxStaticModelDrawInst* smodelDrawInsts;
-		// ...
-	};
-	static_assert(offsetof(GfxWorld, lastSunPrimaryLightIndex) == 0x34);
-	static_assert(offsetof(GfxWorld, primaryLightCount) == 0x38);
-	static_assert(offsetof(GfxWorld, movingScriptablePrimaryLightCount) == 0x3C);
-	static_assert(offsetof(GfxWorld, lightRegion) == 0xCA0);
-	static_assert(offsetof(GfxWorld, smodelCount) == 0xCA8);
-	static_assert(offsetof(GfxWorld, smodelDrawInsts) == 0xFB8);
 
 	// MP 0x8B5040 strides primary lights by 0xA8 and passes the origin at +0x34.
 	struct ComPrimaryLight
@@ -819,41 +747,6 @@ namespace game
 	static_assert(sizeof(GfxSceneModel) == 0xB8);
 	static_assert(offsetof(GfxSceneModel, model) == 0x8);
 	static_assert(offsetof(GfxSceneModel, origin) == 0x28);
-
-	// MP 0x4E0160 indexes poses by 0x3C and loads the origin from +0x10.
-	struct DynEntityPose
-	{
-		float quat[4];
-		vec3_t origin;
-		char __pad0[0x20];
-	};
-	static_assert(sizeof(DynEntityPose) == 0x3C);
-	static_assert(offsetof(DynEntityPose, origin) == 0x10);
-
-	// MP 0x4DDC10 indexes clients by 0x30 and stores the active model at +0x18.
-	struct DynEntityClient
-	{
-		char __pad0[0x18];
-		XModel* activeModel;
-		char __pad1[0x10];
-	};
-	static_assert(sizeof(DynEntityClient) == 0x30);
-	static_assert(offsetof(DynEntityClient, activeModel) == 0x18);
-
-	struct clipMap_t
-	{
-		const char* name;
-		char __pad0[0x330];
-		unsigned short dynEntCount[2];
-		char __pad1[0x4];
-		char __pad2[0x10]; // dynEntDefList[2], 0x78 bytes per def
-		DynEntityPose* dynEntPoseList[2];
-		DynEntityClient* dynEntClientList[2];
-		// ...
-	};
-	static_assert(offsetof(clipMap_t, dynEntCount) == 0x338);
-	static_assert(offsetof(clipMap_t, dynEntPoseList) == 0x350);
-	static_assert(offsetof(clipMap_t, dynEntClientList) == 0x360);
 
 	struct FxSpatialFrame
 	{

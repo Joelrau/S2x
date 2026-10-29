@@ -21,10 +21,9 @@ namespace arxan::call_spoof
 {
 	namespace
 	{
-		// Constructed lazily: threads injected before CRT startup (e.g. RenderDoc)
-		// run TLS initializers and would allocate before the heap lock exists.
 		std::stack<uint64_t>& get_address_stack()
 		{
+			// Only initialize the stack on threads that actually use call spoofing.
 			thread_local std::stack<uint64_t> address_stack{};
 			return address_stack;
 		}
