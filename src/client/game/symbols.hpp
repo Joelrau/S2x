@@ -377,6 +377,8 @@ namespace game
 		WEAK symbol<void(mp::client_t* client, const char* reason, std::uint8_t notify)> SV_DropClient{ 0xF4030 };
 		WEAK symbol<void(int migrate, int loadScripts)> SV_MapRestart{ 0x6D6F60 };
 		WEAK symbol<mp::playerState_s*(int clientNum)> SV_GetPlayerstateForClientNum{ 0x6D9AF0 };
+		WEAK symbol<void(mp::gentity_s* ent, const float* origin, int toggleTeleportBit)> TeleportPlayer{ 0x69E620 };
+		WEAK symbol<void(mp::gentity_s* ent, const float* angles)> SetClientViewAngle{ 0x69BE70 };
 
 		WEAK symbol<Weapon(const char* name)> G_GetWeaponForName{ 0x5C4C00 };
 		WEAK symbol<void()> G_SetWeaponConfigstrings{ 0x55C7B0 };

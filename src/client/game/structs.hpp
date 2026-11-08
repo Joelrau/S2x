@@ -1114,9 +1114,15 @@ namespace game
 			char clientNum;
 			bool cursorHintDualWield;
 			uint8_t pm_type;
+			char __pad3[0x84 - 0x3];
+			vec3_t origin;
+			char __pad90[0x240 - 0x90];
+			vec3_t viewangles;
 
 			// ... incomplete
 		};
+		static_assert(offsetof(playerState_s, origin) == 0x84);
+		static_assert(offsetof(playerState_s, viewangles) == 0x240);
 
 		struct gclient_s
 		{
@@ -1136,16 +1142,22 @@ namespace game
 
 		struct gentity_s
 		{
-			char __pad0[0x258];
+			char __pad0[0x234];
+			vec3_t currentOrigin;
+			char __pad240[0x258 - 0x240];
 			gclient_s* client;
-			char __pad260[0x2B8 - 0x260];
+			char __pad260[0x268 - 0x260];
+			playerState_s* playerState;
+			char __pad270[0x2B8 - 0x270];
 			int flags;
 			char __pad2BC[0x2DC - 0x2BC];
 			int health;
 			char __pad2E0[0x418 - 0x2E0];
 		};
 		static_assert(sizeof(gentity_s) == 0x418);
+		static_assert(offsetof(gentity_s, currentOrigin) == 0x234);
 		static_assert(offsetof(gentity_s, client) == 0x258);
+		static_assert(offsetof(gentity_s, playerState) == 0x268);
 		static_assert(offsetof(gentity_s, flags) == 0x2B8);
 		static_assert(offsetof(gentity_s, health) == 0x2DC);
 

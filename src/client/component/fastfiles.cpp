@@ -26,6 +26,7 @@ namespace fastfiles
 		constexpr auto mod_zone_alloc_flags = 0x10000000;
 		constexpr auto mod_zone_name = "mod";
 
+		constexpr auto physpreset_size = 0x88u;
 		constexpr auto techset_size = 0x3A0u;
 
 		std::vector<std::string> user_zones;
@@ -41,6 +42,7 @@ namespace fastfiles
 
 		void reallocate_asset_pools()
 		{
+			reallocate_asset_pool<game::ASSET_TYPE_PHYSPRESET, physpreset_size, 128 * 4>();
 			reallocate_asset_pool<game::ASSET_TYPE_TECHSET, techset_size, 3584 * 2>();
 		}
 
@@ -210,6 +212,18 @@ namespace fastfiles
 			}
 
 			return sys_create_file_hook.invoke<HANDLE>(folder, filename);
+		}
+
+		utils::hook::detour db_fastfile_exists_hook;
+
+		bool db_fastfile_exists_stub(const char* name, const int file_type)
+		{
+			if (db_fastfile_exists_hook.invoke<bool>(name, file_type))
+			{
+				return true;
+			}
+
+			return file_type == 0 && name && *name && exists(name);
 		}
 
 		bool is_ui_zone(const char* name)
@@ -552,6 +566,7 @@ namespace fastfiles
 			reallocate_asset_pools();
 
 			sys_create_file_hook.create(game::mp::Sys_CreateFile, sys_create_file_stub);
+			db_fastfile_exists_hook.create(game::DB_FastfileExists, db_fastfile_exists_stub);
 
 			// allow unsigned ff
 			utils::hook::set<std::uint8_t>(0x4A6BC3_g, 0xEB);
