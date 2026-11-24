@@ -3,6 +3,8 @@
 #include "game/game.hpp"
 #include "party_session.hpp"
 
+#include <utils/info_string.hpp>
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -18,6 +20,11 @@ namespace party
 	};
 
 	game::netadr_s& get_target();
+	void connect_to(const game::netadr_s& target);
+	// Resumes a held, validated s2x_infoResponse
+	void continue_connect(const game::netadr_s& from, const utils::info_string& info,
+		int max_clients, std::uint64_t attempt_id);
+	std::string get_advertised_map_name();
 	bool is_connection_attempt_current(std::uint64_t attempt_id);
 	void cancel_pending_connection();
 	void queue_connect(std::string address);

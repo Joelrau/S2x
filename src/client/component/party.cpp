@@ -6,6 +6,7 @@
 #include "custom_match.hpp"
 #include "dedicated_party.hpp"
 #include "dedicated_party_client.hpp"
+#include "download.hpp"
 #include "fastfiles.hpp"
 #include "headquarters.hpp"
 #include "command.hpp"
@@ -1145,6 +1146,100 @@ namespace party
 				&& info.max_players <= game::environment::get_online_mode_info().max_players;
 		}
 
+		// The map send_info_response advertises
+		std::string get_advertised_map()
+		{
+			party::session::connect_info party_connect_info{};
+			if (headquarters::get_connect_info(party_connect_info))
+			{
+				return party_connect_info.map_name;
+			}
+
+			if (headquarters::is_host())
+			{
+				return {};
+			}
+
+			if (dedicated_party::get_connect_info(party_connect_info)
+				|| get_custom_lobby_connect_info(party_connect_info))
+			{
+				return party_connect_info.map_name;
+			}
+
+			return game::is_server_running() ? get_current_mapname() : std::string{};
+		}
+
+		void continue_validated_connect(const game::netadr_s& from, const utils::info_string& info,
+			const int max_clients, const std::uint64_t attempt_id)
+		{
+			if (!is_connection_attempt_current(attempt_id))
+			{
+				return;
+			}
+
+			// Dedicated and custom lobbies can be joined before gameplay starts.
+			// Hand the stock session descriptor to CL_Connect before applying
+			// direct-game connection requirements such as sv_running.
+			if (dedicated_party_client::try_handle_join(from, info, max_clients, attempt_id))
+			{
+				return;
+			}
+
+			const auto sv_running = info.get("sv_running");
+			if (sv_running != "1")
+			{
+				console::error("Connection failed: server is not running.\n");
+				return;
+			}
+
+			const auto mapname = info.get("mapname");
+			const auto gametype = info.get("gametype");
+
+			{
+				// Only validates the map, connect_to_server registers it again when it connects
+				arena::map_registration_scope registration;
+				if (!validate_map_and_gametype(mapname, gametype))
+				{
+					return;
+				}
+			}
+
+			console::info(
+				"Server response from %s: map='%s' gametype='%s' clients=%s/%i\n",
+				network::net_adr_to_string(from),
+				mapname.data(),
+				gametype.data(),
+				info.get("clients").data(),
+				max_clients
+			);
+
+			auto target = from;
+
+			scheduler::once([target, mapname, gametype, max_clients, attempt_id]()
+			{
+				if (!is_connection_attempt_current(attempt_id))
+				{
+					return;
+				}
+
+				if (game::virtual_lobby_loaded())
+				{
+					console::info("Leaving virtual lobby before direct connection.\n");
+					game::CL_VirtualLobbyShutdown(0, 0);
+				}
+
+				scheduler::once([target, mapname, gametype, max_clients, attempt_id]()
+				{
+					if (!is_connection_attempt_current(attempt_id))
+					{
+						return;
+					}
+
+					connect_to_server(target, mapname, gametype, max_clients, attempt_id);
+				}, scheduler::pipeline::main);
+			}, scheduler::pipeline::main);
+		}
+
 		void send_info_response(const game::netadr_s& from, std::string_view data, const std::string& response_command)
 		{
 			// The challenge is optional: rcon tools such as IW4MAdmin send a bare "s2x_getInfo\0".
@@ -1219,6 +1314,13 @@ namespace party
 			info.set("protocol", std::to_string(PROTOCOL));
 			info.set("s2x", "1");
 
+			// Only advertised by a host serving the map
+			if (response_command == "s2x_infoResponse" && (gameplay_running || has_party_session)
+				&& download::is_server_usermap(mapname))
+			{
+				info.set("usermap", mapname);
+			}
+
 			if (has_party_session && response_command == "s2x_infoResponse")
 			{
 				info.set("party_session", has_hq_session ? "3" : has_custom_session ? "2" : "1");
@@ -1273,6 +1375,22 @@ namespace party
 	game::netadr_s& get_target()
 	{
 		return connect_state.host;
+	}
+
+	void connect_to(const game::netadr_s& target)
+	{
+		connect(target);
+	}
+
+	void continue_connect(const game::netadr_s& from, const utils::info_string& info,
+		const int max_clients, const std::uint64_t attempt_id)
+	{
+		continue_validated_connect(from, info, max_clients, attempt_id);
+	}
+
+	std::string get_advertised_map_name()
+	{
+		return get_advertised_map();
 	}
 
 	bool is_connection_attempt_current(const std::uint64_t attempt_id)
@@ -1526,67 +1644,13 @@ namespace party
 				console::info("[party] validated server response from %s.\n",
 					network::net_adr_to_string(from));
 
-				// Dedicated and custom lobbies can be joined before gameplay starts.
-				// Hand the stock session descriptor to CL_Connect before applying
-				// direct-game connection requirements such as sv_running.
-				if (dedicated_party_client::try_handle_join(from, info, max_clients, attempt_id))
+				// Usermaps are checked and downloaded first
+				if (download::begin_connect_check(from, info, max_clients, attempt_id))
 				{
 					return;
 				}
 
-				const auto sv_running = info.get("sv_running");
-				if (sv_running != "1")
-				{
-					console::error("Connection failed: server is not running.\n");
-					return;
-				}
-
-				const auto mapname = info.get("mapname");
-				const auto gametype = info.get("gametype");
-
-				{
-					// Only validates the map, connect_to_server registers it again when it connects
-					arena::map_registration_scope registration;
-					if (!validate_map_and_gametype(mapname, gametype))
-					{
-						return;
-					}
-				}
-
-				console::info(
-					"Server response from %s: map='%s' gametype='%s' clients=%i/%i\n",
-					network::net_adr_to_string(from),
-					mapname.data(),
-					gametype.data(),
-					client_count,
-					max_clients
-				);
-
-				auto target = from;
-
-				scheduler::once([target, mapname, gametype, max_clients, attempt_id]()
-				{
-					if (!is_connection_attempt_current(attempt_id))
-					{
-						return;
-					}
-
-					if (game::virtual_lobby_loaded())
-					{
-						console::info("Leaving virtual lobby before direct connection.\n");
-						game::CL_VirtualLobbyShutdown(0, 0);
-					}
-
-					scheduler::once([target, mapname, gametype, max_clients, attempt_id]()
-					{
-						if (!is_connection_attempt_current(attempt_id))
-						{
-							return;
-						}
-
-						connect_to_server(target, mapname, gametype, max_clients, attempt_id);
-					}, scheduler::pipeline::main);
-				}, scheduler::pipeline::main);
+				continue_validated_connect(from, info, max_clients, attempt_id);
 			});
 		}
 	};
