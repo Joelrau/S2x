@@ -5,7 +5,7 @@
 #include "game/ui_scripting/execution.hpp"
 
 #include "download.hpp"
-#include "dedicated_party_client.hpp"
+#include "party_client.hpp"
 #include "filesystem.hpp"
 #include "network.hpp"
 #include "party.hpp"
@@ -1381,7 +1381,7 @@ namespace download
 
 			if (job->purpose == check_purpose::rotation)
 			{
-				const auto still_joined = dedicated_party_client::has_dedicated_session(game::Lobby_GetPartyData(0))
+				const auto still_joined = party_client::has_dedicated_session(game::Lobby_GetPartyData(0))
 					&& is_matching_ip_endpoint(party::get_target(), job->host);
 				if (!still_joined || job->cancel)
 				{
@@ -1428,7 +1428,7 @@ namespace download
 				if (std::chrono::steady_clock::now() - job->started > stale_info_age)
 				{
 					// Info may be stale; the recheck hits the hash cache
-					party::connect_to(job->host);
+					party::retry_connect(job->host, job->attempt_id);
 					return;
 				}
 
@@ -1436,7 +1436,7 @@ namespace download
 				return;
 			case job_result_type::downloaded:
 				console::info("[Download] Map '%s' downloaded. Reconnecting...\n", job->map_name.data());
-				party::connect_to(job->host);
+				party::retry_connect(job->host, job->attempt_id);
 				return;
 			case job_result_type::declined:
 				console::info("[Download] Download of map '%s' declined.\n", job->map_name.data());
@@ -1498,7 +1498,7 @@ namespace download
 				return !party::is_connection_attempt_current(job.attempt_id);
 			}
 
-			return !dedicated_party_client::has_dedicated_session(game::Lobby_GetPartyData(0));
+			return !party_client::has_dedicated_session(game::Lobby_GetPartyData(0));
 		}
 
 		void run_client_frame()

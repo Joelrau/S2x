@@ -17,6 +17,10 @@ namespace party
 		session::descriptor session{};
 		std::string map_name{};
 		std::string gametype{};
+		bool friend_join{};
+		std::uint32_t discord_token{};
+		bool custom_invite{};
+		bool follow_party{};
 	};
 
 	game::netadr_s& get_target();
@@ -24,10 +28,18 @@ namespace party
 	// Resumes a held, validated s2x_infoResponse
 	void continue_connect(const game::netadr_s& from, const utils::info_string& info,
 		int max_clients, std::uint64_t attempt_id);
+	// Reconnects with the held attempt's invite context
+	void retry_connect(const game::netadr_s& target, std::uint64_t attempt_id);
 	std::string get_advertised_map_name();
 	bool is_connection_attempt_current(std::uint64_t attempt_id);
+	std::uint64_t get_connection_attempt_id();
 	void cancel_pending_connection();
 	void queue_connect(std::string address);
+	void queue_session_join(std::string address, std::string session_id, std::uint64_t expires,
+		bool friend_join = false, std::uint32_t discord_token = 0, bool follow_party = false);
+	std::string get_current_session_id(int party_type = 0);
+	bool has_session(std::string_view session_id);
+	game::PartyData* get_invite_connect_info(session::connect_info& info);
 	void execute_internal_connect(const internal_connect_request& request);
 
 	bool resolve_map_index(const std::string& map_name, int& map_index);

@@ -204,6 +204,7 @@ namespace game
 	WEAK symbol<PartyData*()> Live_GetGameParty{ 0x789620 };
 	WEAK symbol<std::uint8_t(PartyData* partyData, std::uint64_t xuid)> Party_FindMemberByXUID{ 0x6FDDA0 };
 	WEAK symbol<int(PartyData* partyData)> Party_IsRunning{ 0x47A6C0 };
+	WEAK symbol<void(PartyData* partyData)> Party_Sleep{ 0x484250 };
 	WEAK symbol<int(PartyData* partyData)> Party_AreWeHost{ 0x47A6F0 };
 	WEAK symbol<bool(PartyData* partyData, int memberIndex)> Party_IsHost{ 0x480F10 };
 	WEAK symbol<int(PartyData* partyData, int memberIndex)> Party_IsMemberLocalPlayer{ 0x481320 };
@@ -432,6 +433,8 @@ namespace game
 	WEAK symbol<void()> LUI_LeaveCriticalSection{ 0xC5F80, 0x191FB0 };
 	WEAK symbol<std::int64_t(void* transactionId)> AE_GenerateTransactionId{ 0x8390A0 };
 	WEAK symbol<bool(unsigned int controllerIndex, const void* transactionId)> AE_FetchUserAchievements{ 0x139350 };
+	WEAK symbol<int(const char* name)> AE_ChallengeNameToId{ 0x139D50 };
+	WEAK symbol<bool(int controllerIndex, const int* ids, unsigned int count)> AE_FetchAchievementsById{ 0x13E220 };
 	WEAK symbol<unsigned int(const char* reference)> BG_GetItemGUIDFromReference{ 0x6524C0 };
 	WEAK symbol<int(unsigned int controllerIndex, unsigned int itemGuid)> Inventory_GetItemQuantity{ 0x279480 };
 	WEAK symbol<bool(unsigned int itemGuid)> Inventory_IsItemGuidAZMConsumable{ 0x652490 };
