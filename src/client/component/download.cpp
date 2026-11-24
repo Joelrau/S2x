@@ -706,10 +706,6 @@ namespace download
 			{
 				info.set("status", "unavailable");
 			}
-			else if (!is_valid_base_url(base_url))
-			{
-				info.set("status", "nourl");
-			}
 			else
 			{
 				const auto status = get_server_manifest(map_name, entries);
@@ -720,7 +716,12 @@ namespace download
 
 			if (!entries.empty())
 			{
-				info.set("base_url", base_url);
+				// Clients that already have the map can join without a download URL
+				if (is_valid_base_url(base_url))
+				{
+					info.set("base_url", base_url);
+				}
+
 				for (const auto& entry : entries)
 				{
 					info.set(entry.key + "_size", std::to_string(entry.size));
@@ -1267,16 +1268,24 @@ namespace download
 				return;
 			}
 
-			if (job.purpose == check_purpose::rotation)
-			{
-				job.result = job_result_type::needs_download;
-				return;
-			}
-
 			std::uint64_t total_size = 0;
 			for (const auto& download : downloads)
 			{
 				total_size += download.entry.size;
+			}
+
+			if (job.base_url.empty())
+			{
+				job.result = job_result_type::failed;
+				job.error = "This server runs the custom map '" + job.map_name + "' (" + format_size(total_size)
+					+ ") but has no download URL (sv_wwwBaseUrl).";
+				return;
+			}
+
+			if (job.purpose == check_purpose::rotation)
+			{
+				job.result = job_result_type::needs_download;
+				return;
 			}
 
 			if (job.allow_download == 0)
@@ -1501,6 +1510,26 @@ namespace download
 			return !party_client::has_dedicated_session(game::Lobby_GetPartyData(0));
 		}
 
+		// Without a manifest, join unchecked if the map is installed
+		void continue_without_manifest(const std::string& reason)
+		{
+			const auto query = manifest_query;
+			clear_manifest_query();
+			if (query.purpose != check_purpose::connect)
+			{
+				return;
+			}
+
+			if (resolve_file(query.map_name, query.map_name + ".ff").location == file_location::none)
+			{
+				show_connect_error(reason);
+				return;
+			}
+
+			console::warn("[Download] %s Joining with the local copy unchecked.\n", reason.data());
+			party::continue_connect(query.host, query.info, query.max_clients, query.attempt_id);
+		}
+
 		void run_client_frame()
 		{
 			if (running_job && !running_job->cancel && is_job_obsolete(*running_job))
@@ -1535,12 +1564,7 @@ namespace download
 			const auto now = std::chrono::steady_clock::now();
 			if (now - manifest_query.started > manifest_timeout)
 			{
-				if (manifest_query.purpose == check_purpose::connect)
-				{
-					show_connect_error("the server didn't provide the map '" + manifest_query.map_name + "' in time.");
-				}
-
-				clear_manifest_query();
+				continue_without_manifest("The server didn't provide the map '" + manifest_query.map_name + "' in time.");
 				return;
 			}
 
@@ -1627,22 +1651,14 @@ namespace download
 
 			if (status != "ready")
 			{
-				if (is_connect)
-				{
-					show_connect_error(status == "nourl"
-						? "the server runs the custom map '" + manifest_query.map_name
-							+ "' but has no download URL (sv_wwwBaseUrl)."
-						: "the server can't provide its custom map '" + manifest_query.map_name + "'.");
-				}
-
-				clear_manifest_query();
+				continue_without_manifest("The server can't provide its custom map '" + manifest_query.map_name + "'.");
 				return;
 			}
 
 			std::vector<manifest_entry> entries{};
 			std::string error{};
 			const auto base_url = info.get("base_url");
-			if (!is_valid_base_url(base_url))
+			if (!base_url.empty() && !is_valid_base_url(base_url))
 			{
 				error = "the server's download URL is invalid.";
 			}
